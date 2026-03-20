@@ -2,7 +2,6 @@ package com.example.tethervpn
 
 import android.content.Intent
 import android.net.VpnService
-import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import java.io.File
@@ -12,14 +11,17 @@ import java.io.IOException
 class TetherVpnService : VpnService() {
 
     private var vpnInterface: ParcelFileDescriptor? = null
+    private var vpnProcess: Process? = null
+    private val TAG = "TetherVpnService"
     private lateinit var binaryFile: File
 
-    private val TAG = "TetherVpnService"
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val mode = intent?.getIntExtra("MODE", 1) ?: 1 // 1=Tor, 2=Direct, 3=Proxy
+
         setupVpn()
-        copyAndCheckBinary()
-        startTun2Socks()
+        copyBinary()
+        startCustomNetworkStack(mode)
+
         return START_STICKY
     }
 
@@ -28,10 +30,10 @@ class TetherVpnService : VpnService() {
         builder.addAddress("10.0.0.2", 24)
         builder.addRoute("0.0.0.0", 0)
         vpnInterface = builder.establish()
-        Log.d(TAG, "VPN interface established")
+        Log.d(TAG, "[VPN] Interface established")
     }
 
-    private fun copyAndCheckBinary() {
+    private fun copyBinary() {
         binaryFile = File(filesDir, "tor_gateway")
         if (!binaryFile.exists()) {
             try {
@@ -41,42 +43,45 @@ class TetherVpnService : VpnService() {
                     }
                 }
                 binaryFile.setExecutable(true)
-                Log.d(TAG, "Binary copied and made executable: ${binaryFile.absolutePath}")
+                Log.d(TAG, "[Binary] Copied and executable: ${binaryFile.absolutePath}")
             } catch (e: IOException) {
-                Log.e(TAG, "Failed to copy binary: ${e.message}")
+                Log.e(TAG, "[Binary] Failed to copy: ${e.message}")
             }
         } else {
-            Log.d(TAG, "Binary already exists: ${binaryFile.absolutePath}")
-        }
-
-        // Try loading library if applicable
-        try {
-            System.loadLibrary("tun2socks")
-            Log.d(TAG, "tun2socks library loaded successfully")
-        } catch (e: UnsatisfiedLinkError) {
-            Log.e(TAG, "Failed to load tun2socks library: ${e.message}")
+            Log.d(TAG, "[Binary] Already exists: ${binaryFile.absolutePath}")
         }
     }
 
-    private fun startTun2Socks() {
-        vpnInterface?.fileDescriptor?.let {
+    private fun startCustomNetworkStack(mode: Int) {
+        vpnInterface?.fileDescriptor?.let { fd ->
             try {
-                Tun2SocksJNI.start(it)
-                Log.d(TAG, "Tun2Socks started")
+                vpnProcess = ProcessBuilder(binaryFile.absolutePath, fd.toString(), mode.toString())
+                    .redirectErrorStream(true)
+                    .start()
+
+                // Log output from the C stack
+                Thread {
+                    vpnProcess?.inputStream?.bufferedReader()?.forEachLine { line ->
+                        Log.d(TAG, "[NetworkStack] $line")
+                    }
+                }.start()
+
+                Log.d(TAG, "[NetworkStack] Started in mode $mode")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to start Tun2Socks: ${e.message}")
+                Log.e(TAG, "[NetworkStack] Failed to start: ${e.message}")
             }
-        } ?: Log.e(TAG, "VPN interface file descriptor is null")
+        } ?: Log.e(TAG, "[NetworkStack] VPN interface fd is null")
+    }
+
+    private fun stopCustomNetworkStack() {
+        vpnProcess?.destroy()
+        vpnProcess = null
+        Log.d(TAG, "[NetworkStack] Stopped")
     }
 
     override fun onDestroy() {
-        try {
-            Tun2SocksJNI.stop()
-            vpnInterface?.close()
-            Log.d(TAG, "VPN stopped and interface closed")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error stopping VPN: ${e.message}")
-        }
+        stopCustomNetworkStack()
+        vpnInterface?.close()
         super.onDestroy()
     }
 }

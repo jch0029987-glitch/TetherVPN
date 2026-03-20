@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.Spinner
 import android.widget.TextView
@@ -30,17 +31,18 @@ class MainActivity : AppCompatActivity() {
         startVpnBtn = findViewById(R.id.start_vpn)
         stopVpnBtn = findViewById(R.id.stop_vpn)
 
-        // 1️⃣ Check Nearby Wi-Fi permission
+        setupModeSelector()
         requestNearbyWifiPermission()
 
-        // 2️⃣ Check VPN permission
-        requestVpnPermission()
+        startVpnBtn.setOnClickListener { requestVpnPermission() }
+        stopVpnBtn.setOnClickListener { stopVpnService() }
+    }
 
-        // 3️⃣ Check if the native library loaded
-        checkLibrary()
-
-        startVpnBtn.setOnClickListener { requestVpnPermission() } // start VPN only after permission
-        stopVpnBtn.setOnClickListener { stopVpn() }
+    private fun setupModeSelector() {
+        val modes = listOf("Tor", "Direct", "Proxy")
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, modes)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        modeSelector.adapter = adapter
     }
 
     private fun requestNearbyWifiPermission() {
@@ -59,19 +61,20 @@ class MainActivity : AppCompatActivity() {
             startActivityForResult(intent, VPN_REQUEST_CODE)
         } else {
             logs.append("\n[Tether] VPN permission already granted")
-            startVpn()
+            startVpnService()
         }
     }
 
-    private fun startVpn() {
-        logs.append("\n[Tether] Starting VPN…")
+    private fun startVpnService() {
+        val mode = modeSelector.selectedItemPosition + 1 // 1=Tor, 2=Direct, 3=Proxy
+        logs.append("\n[Tether] Starting VPN service with mode $mode…")
         val intent = Intent(this, TetherVpnService::class.java)
-        intent.putExtra("MODE", modeSelector.selectedItemPosition + 1)
+        intent.putExtra("MODE", mode)
         startService(intent)
     }
 
-    private fun stopVpn() {
-        logs.append("\n[Tether] Stopping VPN…")
+    private fun stopVpnService() {
+        logs.append("\n[Tether] Stopping VPN service…")
         val intent = Intent(this, TetherVpnService::class.java)
         stopService(intent)
     }
@@ -92,20 +95,10 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == VPN_REQUEST_CODE) {
             if (resultCode == Activity.RESULT_OK) {
                 logs.append("\n[Tether] VPN permission granted")
-                startVpn()
+                startVpnService()
             } else {
                 logs.append("\n[Tether] VPN permission denied")
             }
-        }
-    }
-
-    // Check if native library loaded
-    private fun checkLibrary() {
-        try {
-            System.loadLibrary("tun2socks")
-            logs.append("\n[Library] tun2socks loaded successfully")
-        } catch (e: UnsatisfiedLinkError) {
-            logs.append("\n[Library] Failed to load tun2socks: ${e.message}")
         }
     }
 }
