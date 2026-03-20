@@ -13,8 +13,7 @@
         android:allowBackup="true"
         android:label="TetherVPN"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Light.NoTitleBar">   
-     <!-- Main Activity -->
+        android:theme="@style/Theme.TetherVPN">     <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
