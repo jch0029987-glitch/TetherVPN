@@ -2,6 +2,7 @@ package com.example.tethervpn
 
 import android.content.Intent
 import android.net.VpnService
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import java.io.File
@@ -16,7 +17,8 @@ class TetherVpnService : VpnService() {
     private lateinit var binaryFile: File
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val mode = intent?.getIntExtra("MODE", 1) ?: 1 // 1=Tor, 2=Direct, 3=Proxy
+        val mode = intent?.getIntExtra("MODE", 1) ?: 1
+        Log.d(TAG, "[VPN] Starting VPN service in mode $mode")
 
         setupVpn()
         copyBinary()
@@ -29,8 +31,15 @@ class TetherVpnService : VpnService() {
         val builder = Builder()
         builder.addAddress("10.0.0.2", 24)
         builder.addRoute("0.0.0.0", 0)
+
+        // Kill switch: block non-VPN traffic
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            builder.allowBypass(false)
+        }
+
         vpnInterface = builder.establish()
-        Log.d(TAG, "[VPN] Interface established")
+        if (vpnInterface != null) Log.d(TAG, "[VPN] Interface established")
+        else Log.e(TAG, "[VPN] Failed to establish VPN interface")
     }
 
     private fun copyBinary() {
@@ -43,13 +52,11 @@ class TetherVpnService : VpnService() {
                     }
                 }
                 binaryFile.setExecutable(true)
-                Log.d(TAG, "[Binary] Copied and executable: ${binaryFile.absolutePath}")
+                Log.d(TAG, "[Binary] Copied and executable")
             } catch (e: IOException) {
                 Log.e(TAG, "[Binary] Failed to copy: ${e.message}")
             }
-        } else {
-            Log.d(TAG, "[Binary] Already exists: ${binaryFile.absolutePath}")
-        }
+        } else Log.d(TAG, "[Binary] Already exists")
     }
 
     private fun startCustomNetworkStack(mode: Int) {
@@ -59,7 +66,7 @@ class TetherVpnService : VpnService() {
                     .redirectErrorStream(true)
                     .start()
 
-                // Log output from the C stack
+                // Log output
                 Thread {
                     vpnProcess?.inputStream?.bufferedReader()?.forEachLine { line ->
                         Log.d(TAG, "[NetworkStack] $line")
@@ -74,14 +81,29 @@ class TetherVpnService : VpnService() {
     }
 
     private fun stopCustomNetworkStack() {
-        vpnProcess?.destroy()
+        vpnProcess?.let {
+            if (it.isAlive) {
+                Log.d(TAG, "[NetworkStack] Destroying C process…")
+                it.destroy()
+                it.waitFor()
+            }
+        }
         vpnProcess = null
-        Log.d(TAG, "[NetworkStack] Stopped")
+
+        vpnInterface?.let {
+            try {
+                Log.d(TAG, "[VPN] Closing TUN interface…")
+                it.close()
+            } catch (e: Exception) {
+                Log.e(TAG, "[VPN] Failed to close TUN: ${e.message}")
+            }
+        }
+        vpnInterface = null
+        Log.d(TAG, "[VPN] VPN service stopped")
     }
 
     override fun onDestroy() {
         stopCustomNetworkStack()
-        vpnInterface?.close()
         super.onDestroy()
     }
 }
