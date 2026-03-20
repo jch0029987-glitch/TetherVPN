@@ -1,36 +1,25 @@
 package com.example.tethervpn
 
-import android.app.PendingIntent
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 
 class TetherVpnService : VpnService() {
 
     private var vpnInterface: ParcelFileDescriptor? = null
-    private var gatewayProcess: Process? = null
-    private var currentMode = 1 // default Tor
+    private lateinit var binaryFile: File
+
+    private val TAG = "TetherVpnService"
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        currentMode = intent?.getIntExtra("MODE", 1) ?: 1
-
-        // Copy binary from assets if not already present
-        val binaryFile = File(filesDir, "tor_gateway")
-        if (!binaryFile.exists()) {
-            assets.open("tor_gateway").use { input ->
-                binaryFile.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-            binaryFile.setExecutable(true)
-            Log.i("TetherVpnService", "Binary copied from assets")
-        }
-
         setupVpn()
-        startGateway(binaryFile)
+        copyAndCheckBinary()
+        startTun2Socks()
         return START_STICKY
     }
 
@@ -39,27 +28,55 @@ class TetherVpnService : VpnService() {
         builder.addAddress("10.0.0.2", 24)
         builder.addRoute("0.0.0.0", 0)
         vpnInterface = builder.establish()
-        Log.i("TetherVpnService", "VPN established: fd=${vpnInterface?.fileDescriptor}")
+        Log.d(TAG, "VPN interface established")
     }
 
-    private fun startGateway(binaryFile: File) {
-        vpnInterface?.fileDescriptor?.let { fd ->
-            gatewayProcess = ProcessBuilder(binaryFile.absolutePath, fd.toString(), currentMode.toString())
-                .redirectErrorStream(true)
-                .start()
-
-            Thread {
-                gatewayProcess?.inputStream?.bufferedReader()?.forEachLine {
-                    Log.i("Gateway", it)
+    private fun copyAndCheckBinary() {
+        binaryFile = File(filesDir, "tor_gateway")
+        if (!binaryFile.exists()) {
+            try {
+                assets.open("tor_gateway").use { input ->
+                    FileOutputStream(binaryFile).use { output ->
+                        input.copyTo(output)
+                    }
                 }
-            }.start()
+                binaryFile.setExecutable(true)
+                Log.d(TAG, "Binary copied and made executable: ${binaryFile.absolutePath}")
+            } catch (e: IOException) {
+                Log.e(TAG, "Failed to copy binary: ${e.message}")
+            }
+        } else {
+            Log.d(TAG, "Binary already exists: ${binaryFile.absolutePath}")
+        }
+
+        // Try loading library if applicable
+        try {
+            System.loadLibrary("tun2socks")
+            Log.d(TAG, "tun2socks library loaded successfully")
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e(TAG, "Failed to load tun2socks library: ${e.message}")
         }
     }
 
+    private fun startTun2Socks() {
+        vpnInterface?.fileDescriptor?.let {
+            try {
+                Tun2SocksJNI.start(it)
+                Log.d(TAG, "Tun2Socks started")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start Tun2Socks: ${e.message}")
+            }
+        } ?: Log.e(TAG, "VPN interface file descriptor is null")
+    }
+
     override fun onDestroy() {
-        Log.i("TetherVpnService", "Stopping VPN and gateway")
-        gatewayProcess?.destroy()
-        vpnInterface?.close()
+        try {
+            Tun2SocksJNI.stop()
+            vpnInterface?.close()
+            Log.d(TAG, "VPN stopped and interface closed")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping VPN: ${e.message}")
+        }
         super.onDestroy()
     }
 }
