@@ -2,17 +2,27 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 36
+    compileSdkVersion 36      // updated from 34 to 36
     namespace 'com.example.tethervpn'
 
     defaultConfig {
         applicationId "com.example.tethervpn"
-        minSdkVersion 29
-        targetSdkVersion 36
+        minSdkVersion 30
+        targetSdkVersion 36   // updated from 34 to 36
         versionCode 1
         versionName "1.0"
 
         vectorDrawables.useSupportLibrary = true
+    }
+
+    // Ensure Java/Kotlin versions match
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
     }
 
     buildTypes {
@@ -25,7 +35,7 @@ android {
         }
     }
 
-    // Include assets
+    // Include assets folder (your C binary)
     sourceSets {
         main {
             assets.srcDirs = ['src/main/assets']
@@ -34,7 +44,10 @@ android {
 }
 
 dependencies {
+    // Kotlin standard library
     implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.0"
+
+    // AndroidX
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.core:core-ktx:1.15.0'
     implementation 'com.google.android.material:material:1.12.0'
