@@ -2,13 +2,13 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 34
+    compileSdkVersion 36
     namespace 'com.example.tethervpn'
 
     defaultConfig {
         applicationId "com.example.tethervpn"
-        minSdkVersion 30
-        targetSdkVersion 34
+        minSdkVersion 29
+        targetSdkVersion 36
         versionCode 1
         versionName "1.0"
 
