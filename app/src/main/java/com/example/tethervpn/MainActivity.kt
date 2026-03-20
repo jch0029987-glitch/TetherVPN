@@ -1,5 +1,6 @@
 package com.example.tethervpn
 
+import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -29,8 +30,8 @@ class MainActivity : AppCompatActivity() {
 
         // Request Nearby Wi-Fi permission if needed
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            if (checkSelfPermission(android.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(android.permission.NEARBY_WIFI_DEVICES), PERMISSION_REQUEST_CODE)
+            if (checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES), PERMISSION_REQUEST_CODE)
             }
         }
 
