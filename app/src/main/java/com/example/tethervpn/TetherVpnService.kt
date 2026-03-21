@@ -2,108 +2,112 @@ package com.example.tethervpn
 
 import android.content.Intent
 import android.net.VpnService
-import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
 
 class TetherVpnService : VpnService() {
 
     private var vpnInterface: ParcelFileDescriptor? = null
-    private var vpnProcess: Process? = null
-    private val TAG = "TetherVpnService"
-    private lateinit var binaryFile: File
+    private var process: Process? = null
+    private val TAG = "TetherVPN"
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val mode = intent?.getIntExtra("MODE", 1) ?: 1
-        Log.d(TAG, "[VPN] Starting VPN service in mode $mode")
 
-        setupVpn()
-        copyBinary()
-        startCustomNetworkStack(mode)
+        Log.d(TAG, "[VPN] Starting service mode=$mode")
+
+        startVpn(mode)
 
         return START_STICKY
     }
 
-    private fun setupVpn() {
-        val builder = Builder()
-        builder.addAddress("10.0.0.2", 24)
-        builder.addRoute("0.0.0.0", 0)
+    private fun startVpn(mode: Int) {
+        stopVpn() // ensure clean restart
 
-        // Kill switch: block non-VPN traffic
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            builder.allowBypass(false)
-        }
+        try {
+            val builder = Builder()
+            builder.setSession("TetherVPN")
 
-        vpnInterface = builder.establish()
-        if (vpnInterface != null) Log.d(TAG, "[VPN] Interface established")
-        else Log.e(TAG, "[VPN] Failed to establish VPN interface")
-    }
+            builder.addAddress("10.0.0.2", 24)
+            builder.addRoute("0.0.0.0", 0)
 
-    private fun copyBinary() {
-        binaryFile = File(filesDir, "tor_gateway")
-        if (!binaryFile.exists()) {
-            try {
-                assets.open("tor_gateway").use { input ->
-                    FileOutputStream(binaryFile).use { output ->
-                        input.copyTo(output)
-                    }
+            // Optional DNS
+            builder.addDnsServer("1.1.1.1")
+            builder.addDnsServer("8.8.8.8")
+
+            vpnInterface = builder.establish()
+
+            if (vpnInterface == null) {
+                Log.e(TAG, "[VPN] Failed to establish interface")
+                return
+            }
+
+            Log.d(TAG, "[VPN] Interface established")
+
+            val binary = copyBinary()
+
+            val fd = vpnInterface!!.fileDescriptor
+
+            process = ProcessBuilder(
+                binary.absolutePath,
+                fd.toString(),
+                mode.toString()
+            )
+                .redirectErrorStream(true)
+                .start()
+
+            Log.d(TAG, "[VPN] Native process started")
+
+            // Log native output
+            Thread {
+                process?.inputStream?.bufferedReader()?.forEachLine {
+                    Log.d(TAG, "[C] $it")
                 }
-                binaryFile.setExecutable(true)
-                Log.d(TAG, "[Binary] Copied and executable")
-            } catch (e: IOException) {
-                Log.e(TAG, "[Binary] Failed to copy: ${e.message}")
-            }
-        } else Log.d(TAG, "[Binary] Already exists")
+            }.start()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "[VPN] Error: ${e.message}")
+        }
     }
 
-    private fun startCustomNetworkStack(mode: Int) {
-        vpnInterface?.fileDescriptor?.let { fd ->
-            try {
-                vpnProcess = ProcessBuilder(binaryFile.absolutePath, fd.toString(), mode.toString())
-                    .redirectErrorStream(true)
-                    .start()
+    private fun stopVpn() {
+        try {
+            Log.d(TAG, "[VPN] Stopping...")
 
-                // Log output
-                Thread {
-                    vpnProcess?.inputStream?.bufferedReader()?.forEachLine { line ->
-                        Log.d(TAG, "[NetworkStack] $line")
-                    }
-                }.start()
+            process?.destroy()
+            process = null
 
-                Log.d(TAG, "[NetworkStack] Started in mode $mode")
-            } catch (e: Exception) {
-                Log.e(TAG, "[NetworkStack] Failed to start: ${e.message}")
-            }
-        } ?: Log.e(TAG, "[NetworkStack] VPN interface fd is null")
-    }
+            vpnInterface?.close()
+            vpnInterface = null
 
-    private fun stopCustomNetworkStack() {
-        vpnProcess?.let {
-            if (it.isAlive) {
-                Log.d(TAG, "[NetworkStack] Destroying C process…")
-                it.destroy()
-                it.waitFor()
-            }
+        } catch (e: Exception) {
+            Log.e(TAG, "[VPN] Stop error: ${e.message}")
         }
-        vpnProcess = null
-
-        vpnInterface?.let {
-            try {
-                Log.d(TAG, "[VPN] Closing TUN interface…")
-                it.close()
-            } catch (e: Exception) {
-                Log.e(TAG, "[VPN] Failed to close TUN: ${e.message}")
-            }
-        }
-        vpnInterface = null
-        Log.d(TAG, "[VPN] VPN service stopped")
     }
 
     override fun onDestroy() {
-        stopCustomNetworkStack()
+        stopVpn()
         super.onDestroy()
+    }
+
+    private fun copyBinary(): File {
+        val file = File(filesDir, "tor_gateway")
+
+        if (!file.exists()) {
+            Log.d(TAG, "[Binary] Copying...")
+
+            assets.open("tor_gateway").use { input ->
+                FileOutputStream(file).use { output ->
+                    input.copyTo(output)
+                }
+            }
+
+            file.setExecutable(true)
+        }
+
+        Log.d(TAG, "[Binary] Ready at ${file.absolutePath}")
+        return file
     }
 }

@@ -3,7 +3,6 @@ package com.example.tethervpn
 import android.app.Activity
 import android.content.Intent
 import android.net.VpnService
-import android.os.Build
 import android.os.Bundle
 import android.widget.Button
 import android.widget.RadioGroup
@@ -26,51 +25,69 @@ class MainActivity : Activity() {
         stopButton = findViewById(R.id.stopButton)
         modeSelector = findViewById(R.id.modeSelector)
 
+        log("[UI] Ready")
+
         startButton.setOnClickListener {
-            prepareAndStartVpn()
+            log("[UI] Start clicked")
+            prepareVpn()
         }
 
         stopButton.setOnClickListener {
-            stopVpnService()
+            log("[UI] Stop clicked")
+            stopVpn()
         }
     }
 
-    private fun prepareAndStartVpn() {
+    private fun prepareVpn() {
         val intent = VpnService.prepare(this)
         if (intent != null) {
-            // Ask user to allow VPN
-            startActivityForResult(intent, 0)
+            log("[VPN] Requesting permission...")
+            startActivityForResult(intent, 100)
         } else {
-            // Already allowed
-            startVpnService()
+            log("[VPN] Permission already granted")
+            startVpn()
         }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode == RESULT_OK) {
-            startVpnService()
-        } else {
-            Toast.makeText(this, "VPN permission denied", Toast.LENGTH_SHORT).show()
+
+        if (requestCode == 100) {
+            if (resultCode == RESULT_OK) {
+                log("[VPN] Permission granted")
+                startVpn()
+            } else {
+                log("[VPN] Permission denied")
+                Toast.makeText(this, "VPN permission denied", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
-    private fun startVpnService() {
+    private fun startVpn() {
         val mode = when (modeSelector.checkedRadioButtonId) {
             R.id.radioTor -> 1
             R.id.radioDirect -> 2
             R.id.radioProxy -> 3
             else -> 1
         }
-        logs.append("\n[Tether] Starting VPN in mode $mode…")
+
+        log("[VPN] Starting with mode=$mode")
+
         val intent = Intent(this, TetherVpnService::class.java)
         intent.putExtra("MODE", mode)
         startService(intent)
     }
 
-    private fun stopVpnService() {
-        logs.append("\n[Tether] Stopping VPN…")
+    private fun stopVpn() {
+        log("[VPN] Stopping service")
+
         val intent = Intent(this, TetherVpnService::class.java)
         stopService(intent)
+    }
+
+    private fun log(msg: String) {
+        runOnUiThread {
+            logs.append("\n$msg")
+        }
     }
 }

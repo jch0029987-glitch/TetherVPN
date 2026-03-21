@@ -1,38 +1,53 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:padding="16dp"
+
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
 
-    <Spinner
-        android:id="@+id/mode_selector"
+    <RadioGroup
+        android:id="@+id/modeSelector"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:entries="@array/modes" />
+        android:layout_height="wrap_content">
 
-    <Button
-        android:id="@+id/start_vpn"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Start VPN" />
-
-    <Button
-        android:id="@+id/stop_vpn"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Stop VPN" />
-
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <TextView
-            android:id="@+id/logs"
-            android:layout_width="match_parent"
+        <RadioButton
+            android:id="@+id/radioTor"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="12sp"
-            android:textColor="#00FF00"
-            android:scrollbars="vertical"/>
-    </ScrollView>
+            android:text="Tor Mode"
+            android:checked="true"/>
+
+        <RadioButton
+            android:id="@+id/radioDirect"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Direct Mode"/>
+
+        <RadioButton
+            android:id="@+id/radioProxy"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Proxy Mode"/>
+    </RadioGroup>
+
+    <Button
+        android:id="@+id/startButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Start VPN"/>
+
+    <Button
+        android:id="@+id/stopButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Stop VPN"/>
+
+    <TextView
+        android:id="@+id/logs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Logs..."
+        android:paddingTop="16dp"/>
 </LinearLayout>
