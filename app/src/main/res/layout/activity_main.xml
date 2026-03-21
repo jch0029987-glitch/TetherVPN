@@ -1,41 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="24dp"
+    android:background="#FFFFFF">
 
+    <!-- Title -->
+    <TextView
+        android:id="@+id/titleText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="TetherVPN"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:layout_gravity="center_horizontal"
+        android:paddingBottom="16dp"/>
+
+    <!-- VPN Mode Selection -->
     <RadioGroup
         android:id="@+id/modeSelector"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-
-        <RadioButton
-            android:id="@+id/radioTor"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Tor Mode"
-            android:checked="true"/>
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="16dp">
 
         <RadioButton
             android:id="@+id/radioDirect"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Direct Mode"/>
+            android:text="Direct"/>
+
+        <RadioButton
+            android:id="@+id/radioTor"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tor"/>
 
         <RadioButton
             android:id="@+id/radioProxy"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Proxy Mode"/>
+            android:text="SOCKS Proxy"/>
     </RadioGroup>
 
+    <!-- Start / Stop Buttons -->
     <Button
         android:id="@+id/startButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Start VPN"/>
+        android:text="Start VPN"
+        android:layout_marginBottom="8dp"/>
 
     <Button
         android:id="@+id/stopButton"
@@ -43,10 +58,12 @@
         android:layout_height="wrap_content"
         android:text="Stop VPN"/>
 
+    <!-- Status Display -->
     <TextView
-        android:id="@+id/logs"
+        android:id="@+id/statusText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Logs..."
-        android:paddingTop="16dp"/>
+        android:text="Status: Idle"
+        android:paddingTop="16dp"
+        android:textSize="16sp"/>
 </LinearLayout>
