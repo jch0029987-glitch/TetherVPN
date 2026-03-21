@@ -15,8 +15,9 @@ class TetherVpnService : VpnService() {
 
         setupVpn()
         vpnInterface?.fileDescriptor?.let { fd ->
+            val rawFd = fd.fd   // use this instead of detachFd()
             thread {
-                NativeLib.startVpn(fd.detachFd())
+                NativeLib.startVpn(rawFd)
             }
         }
 
