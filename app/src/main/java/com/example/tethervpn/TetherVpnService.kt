@@ -7,6 +7,7 @@ import android.util.Log
 import kotlin.concurrent.thread
 
 class TetherVpnService : VpnService() {
+
     private var vpnInterface: ParcelFileDescriptor? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -14,10 +15,16 @@ class TetherVpnService : VpnService() {
         Log.d("VPN", "Starting VPN mode=$mode")
 
         setupVpn()
+
         vpnInterface?.fileDescriptor?.let { fd ->
-            val rawFd = fd.fd   // use this instead of detachFd()
+            // Pass the raw fd to JNI
             thread {
-                NativeLib.startVpn(rawFd)
+                try {
+                    NativeLib.startVpn(fd.fd)
+                    Log.d("VPN", "VPN started successfully")
+                } catch (e: Exception) {
+                    Log.e("VPN", "Failed to start VPN", e)
+                }
             }
         }
 
@@ -26,15 +33,21 @@ class TetherVpnService : VpnService() {
 
     private fun setupVpn() {
         val builder = Builder()
+        builder.setSession("TetherVPN")
         builder.addAddress("10.0.0.2", 24)
         builder.addRoute("0.0.0.0", 0)
-        builder.setSession("TetherVPN")
         vpnInterface = builder.establish()
+        Log.d("VPN", "VPN interface established")
     }
 
     override fun onDestroy() {
         vpnInterface?.close()
-        NativeLib.stopVpn()
+        try {
+            NativeLib.stopVpn()
+            Log.d("VPN", "VPN stopped")
+        } catch (e: Exception) {
+            Log.e("VPN", "Failed to stop VPN", e)
+        }
         super.onDestroy()
     }
 }
